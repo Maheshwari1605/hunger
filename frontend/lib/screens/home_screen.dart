@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../models/user.dart';
 import '../services/auth_service.dart';
+import '../services/cart_service.dart';
 import '../widgets/brand_logo.dart';
+import '../widgets/cart_sheet.dart';
 import 'pos_screen.dart';
 import 'menu_screen.dart';
 import 'reports_screen.dart';
@@ -51,31 +54,26 @@ class _HomeScreenState extends State<HomeScreen> {
     ];
 
     final safeIndex = _index.clamp(0, tabs.length - 1);
+    final isPosTab = tabs[safeIndex].label == 'POS';
 
     return Scaffold(
       appBar: AppBar(
+        titleSpacing: 8,
         title: Row(
           children: [
-            const BrandLogo(size: 28),
+            // Tap the brand logo to open the account menu (logout etc.)
+            _BrandMenuButton(user: user),
             const SizedBox(width: 10),
-            Text('Hunger · ${tabs[safeIndex].label}'),
+            Expanded(
+              child: Text(
+                tabs[safeIndex].label,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
           ],
         ),
         actions: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Center(
-              child: Text(
-                '${user.name} (${user.role})',
-                style: const TextStyle(fontSize: 13),
-              ),
-            ),
-          ),
-          IconButton(
-            tooltip: 'Sign out',
-            icon: const Icon(Icons.logout),
-            onPressed: () => context.read<AuthService>().logout(),
-          ),
+          if (isPosTab) const _CartActionButton(),
         ],
       ),
       body: tabs[safeIndex].builder(),
@@ -85,6 +83,76 @@ class _HomeScreenState extends State<HomeScreen> {
         destinations: tabs
             .map((t) => NavigationDestination(icon: Icon(t.icon), label: t.label))
             .toList(),
+      ),
+    );
+  }
+}
+
+class _BrandMenuButton extends StatelessWidget {
+  final AppUser user;
+  const _BrandMenuButton({required this.user});
+
+  @override
+  Widget build(BuildContext context) {
+    return PopupMenuButton<String>(
+      tooltip: 'Account',
+      offset: const Offset(0, 44),
+      padding: EdgeInsets.zero,
+      itemBuilder: (context) => [
+        PopupMenuItem<String>(
+          enabled: false,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(user.name,
+                  style: const TextStyle(fontWeight: FontWeight.w600)),
+              Text(
+                '${user.email} · ${user.role}',
+                style: const TextStyle(fontSize: 12, color: Colors.black54),
+              ),
+            ],
+          ),
+        ),
+        const PopupMenuDivider(),
+        const PopupMenuItem<String>(
+          value: 'logout',
+          child: Row(
+            children: [
+              Icon(Icons.logout, size: 20),
+              SizedBox(width: 12),
+              Text('Logout'),
+            ],
+          ),
+        ),
+      ],
+      onSelected: (value) {
+        if (value == 'logout') {
+          context.read<AuthService>().logout();
+        }
+      },
+      child: const Padding(
+        padding: EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+        child: BrandLogo(size: 32),
+      ),
+    );
+  }
+}
+
+class _CartActionButton extends StatelessWidget {
+  const _CartActionButton();
+
+  @override
+  Widget build(BuildContext context) {
+    final count = context.select<CartService, int>((c) => c.count);
+    return IconButton(
+      tooltip: 'Cart',
+      onPressed: () => CartSheet.show(context),
+      icon: Badge(
+        isLabelVisible: count > 0,
+        label: Text('$count'),
+        backgroundColor: Theme.of(context).colorScheme.error,
+        textColor: Colors.white,
+        child: const Icon(Icons.shopping_cart_outlined),
       ),
     );
   }

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import 'services/api_client.dart';
 import 'services/auth_service.dart';
+import 'services/cart_service.dart';
 import 'services/menu_service.dart';
 import 'services/order_service.dart';
 import 'services/report_service.dart';
@@ -24,6 +25,7 @@ class HungerApp extends StatelessWidget {
       providers: [
         Provider<ApiClient>.value(value: apiClient),
         ChangeNotifierProvider(create: (_) => AuthService(apiClient)),
+        ChangeNotifierProvider(create: (_) => CartService()),
         Provider(create: (_) => MenuService(apiClient)),
         Provider(create: (_) => OrderService(apiClient)),
         Provider(create: (_) => ReportService(apiClient)),
