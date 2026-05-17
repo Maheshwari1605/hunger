@@ -1,6 +1,5 @@
 // Basic smoke test — verifies the app boots and the login screen renders.
 
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:hunger_cafe/main.dart';

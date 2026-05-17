@@ -1,0 +1,26 @@
+# Render Blueprint — see https://render.com/docs/blueprint-spec
+# When you create a "New Blueprint" in Render and point it at this repo,
+# Render reads this file and provisions everything below automatically.
+
+services:
+  - type: web
+    name: hunger-api
+    runtime: node
+    region: oregon          # change to your preferred region
+    plan: free              # bump to "starter" ($7/mo) to remove free-tier idle spin-down
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true            # Render generates a strong secret on first deploy
+      - key: JWT_EXPIRES_IN
+        value: 8h
+      - key: MONGO_URI
+        sync: false                    # you'll paste this from Atlas in the Render dashboard
+      - key: ALLOWED_ORIGINS
+        sync: false                    # set to your frontend origin once the app is deployed

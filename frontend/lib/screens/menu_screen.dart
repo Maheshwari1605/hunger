@@ -34,8 +34,9 @@ class _MenuScreenState extends State<MenuScreen> {
       builder: (_) => _MenuItemDialog(item: existing),
     );
     if (result == null) return;
+    if (!mounted) return;
+    final svc = context.read<MenuService>();
     try {
-      final svc = context.read<MenuService>();
       if (existing == null) {
         await svc.create(result);
       } else {
@@ -68,8 +69,10 @@ class _MenuScreenState extends State<MenuScreen> {
       ),
     );
     if (ok != true) return;
+    if (!mounted) return;
+    final svc = context.read<MenuService>();
     try {
-      await context.read<MenuService>().remove(item.id);
+      await svc.remove(item.id);
       _reload();
     } catch (e) {
       if (!mounted) return;
