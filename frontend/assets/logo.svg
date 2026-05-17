@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" role="img" aria-label="Hunger Cafe">
+  <!-- Background -->
+  <rect width="240" height="240" rx="120" fill="#F5E9D7"/>
+
+  <!-- Double-circle border -->
+  <circle cx="120" cy="120" r="113" fill="none" stroke="#5C3A1E" stroke-width="2.2"/>
+  <circle cx="120" cy="120" r="106" fill="none" stroke="#5C3A1E" stroke-width="1.2"/>
+
+  <g fill="#5C3A1E">
+    <!-- Leaves on top of the stem -->
+    <path d="M104,52 C97,40 93,32 100,28 C106,28 106,40 104,52 Z"/>
+    <path d="M104,52 C112,42 117,33 110,28 C103,28 103,40 104,52 Z" transform="translate(8,0)"/>
+    <!-- Center stem connecting leaves to letter -->
+    <rect x="106" y="50" width="2.5" height="10"/>
+
+    <!-- Stylized "h"/cup glyph -->
+    <!-- Vertical stem of the h -->
+    <rect x="90" y="58" width="14" height="78"/>
+    <!-- Cup bowl (rounded rectangle, open top to receive steam) -->
+    <path d="M90,118
+             L150,118
+             Q156,118 156,124
+             L156,150
+             Q156,168 138,168
+             L102,168
+             Q90,168 90,150 Z"/>
+    <!-- Cup ear / handle -->
+    <path d="M156,128
+             Q170,128 170,140
+             Q170,152 156,152
+             L156,144
+             Q162,144 162,140
+             Q162,136 156,136 Z"/>
+  </g>
+
+  <!-- Steam from cup (stroke, light) -->
+  <g fill="none" stroke="#5C3A1E" stroke-width="2.2" stroke-linecap="round">
+    <path d="M112,110 C108,103 116,99 112,92 C108,86 116,82 112,76"/>
+    <path d="M124,108 C120,101 128,97 124,90 C120,84 128,80 124,74"/>
+    <path d="M136,110 C132,103 140,99 136,92 C132,86 140,82 136,76"/>
+  </g>
+
+  <!-- "hunger" wordmark -->
+  <text x="120" y="200"
+        text-anchor="middle"
+        font-family="Georgia, 'Times New Roman', serif"
+        font-style="italic"
+        font-size="32"
+        fill="#5C3A1E">hunger</text>
+
+  <!-- "CAFE" tagline with flanking rules -->
+  <g fill="#5C3A1E">
+    <rect x="78" y="217" width="22" height="1.2"/>
+    <rect x="140" y="217" width="22" height="1.2"/>
+  </g>
+  <text x="120" y="222"
+        text-anchor="middle"
+        font-family="Helvetica, Arial, sans-serif"
+        font-size="11"
+        letter-spacing="3"
+        fill="#5C3A1E">CAFE</text>
+</svg>

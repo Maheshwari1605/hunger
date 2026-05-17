@@ -1,0 +1,31 @@
+name: hunger_cafe
+description: Hunger Cafe POS & Management System (Flutter client)
+publish_to: 'none'
+version: 0.1.0
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.6
+  http: ^1.2.1
+  provider: ^6.1.2
+  shared_preferences: ^2.2.3
+  intl: ^0.19.0
+  fl_chart: ^0.68.0
+  flutter_svg: ^2.0.10+1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/logo.svg
+    # Drop your own PNG at assets/logo.png and the app will prefer it.
+    # The line below is commented out so pub get doesn't fail when the file isn't present.
+    # - assets/logo.png
