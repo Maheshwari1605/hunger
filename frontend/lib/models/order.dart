@@ -14,6 +14,14 @@ class CartLine {
         'quantity': quantity,
         'notes': notes,
       };
+
+  Map<String, dynamic> toCacheJson() => {
+        'menuItemId': item.id,
+        'name': item.name,
+        'price': item.price,
+        'quantity': quantity,
+        'notes': notes,
+      };
 }
 
 class OrderSummary {
@@ -29,6 +37,8 @@ class OrderSummary {
   final String cashierName;
   final DateTime createdAt;
   final List<OrderLine> items;
+  // True when this order was created while offline and is waiting to sync.
+  final bool pendingSync;
 
   OrderSummary({
     required this.id,
@@ -43,6 +53,7 @@ class OrderSummary {
     required this.cashierName,
     required this.createdAt,
     required this.items,
+    this.pendingSync = false,
   });
 
   factory OrderSummary.fromJson(Map<String, dynamic> j) => OrderSummary(
@@ -61,6 +72,41 @@ class OrderSummary {
             .map((e) => OrderLine.fromJson(e as Map<String, dynamic>))
             .toList(),
       );
+
+  /// Build a provisional OrderSummary for an order that's been queued offline.
+  /// Used only for displaying the receipt — server will create the real record on sync.
+  factory OrderSummary.provisional({
+    required String localId,
+    required List<CartLine> cart,
+    required double subtotal,
+    required double tax,
+    required double discount,
+    required double total,
+    required String paymentMethod,
+  }) {
+    return OrderSummary(
+      id: localId,
+      orderNumber: 'OFFLINE-${localId.substring(localId.length - 6).toUpperCase()}',
+      subtotal: subtotal,
+      total: total,
+      taxAmount: tax,
+      discount: discount,
+      paymentMethod: paymentMethod,
+      paymentStatus: 'paid',
+      kitchenStatus: 'queued',
+      cashierName: '',
+      createdAt: DateTime.now(),
+      items: cart
+          .map((c) => OrderLine(
+                name: c.item.name,
+                price: c.item.price,
+                quantity: c.quantity,
+                notes: c.notes,
+              ))
+          .toList(),
+      pendingSync: true,
+    );
+  }
 }
 
 class OrderLine {

@@ -31,6 +31,30 @@ class ReceiptDialog extends StatelessWidget {
               Text(_ts.format(order.createdAt),
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.bodySmall),
+              if (order.pendingSync) ...[
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.shade100,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.cloud_off, size: 16),
+                      SizedBox(width: 6),
+                      Flexible(
+                        child: Text(
+                          'Saved offline — will sync when online',
+                          style: TextStyle(fontSize: 12),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               const Divider(),
               ...order.items.map(
                 (line) => Padding(

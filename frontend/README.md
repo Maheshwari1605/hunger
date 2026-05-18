@@ -53,3 +53,14 @@ flutter build web --dart-define=API_BASE_URL=https://api.your-domain.com
 
 - `ApiClient` persists the JWT in `SharedPreferences` and re-hydrates the user on cold start via `/api/auth/me`.
 - All order totals are recomputed server-side; the client values are display-only.
+
+## Offline support
+
+The app keeps working when the network drops, with the following behavior:
+
+- **Menu cache** — every successful menu fetch is saved to `SharedPreferences`. When offline, `MenuService.list()` returns the cached items so the POS grid still renders.
+- **Order queue** — if `POST /api/orders` fails with a network error (not an HTTP error), the order payload is appended to a local queue and the cashier sees a receipt marked *"Saved offline — will sync when online"*.
+- **Sync** — `SyncService` listens to `connectivity_plus` and tries to flush the queue every 30 seconds while online, and immediately when connectivity returns. Successfully synced orders are removed from the queue; the server re-derives prices from the live menu at sync time.
+- **UI indicator** — a cloud icon in the app bar shows online/offline status, plus an orange badge with the count of orders still waiting to sync. Tapping it opens a sheet with a manual **Sync now** button and the last sync error if any.
+
+What is NOT covered offline: login, reports, kitchen status updates, menu admin (CRUD), Excel uploads. Those still require a live connection.

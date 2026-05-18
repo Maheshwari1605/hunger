@@ -4,18 +4,24 @@ import 'package:provider/provider.dart';
 import 'services/api_client.dart';
 import 'services/auth_service.dart';
 import 'services/cart_service.dart';
+import 'services/connectivity_service.dart';
+import 'services/local_store.dart';
 import 'services/menu_service.dart';
 import 'services/order_service.dart';
 import 'services/report_service.dart';
+import 'services/sync_service.dart';
 import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
 
-void main() {
-  runApp(const HungerApp());
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final store = await LocalStore.create();
+  runApp(HungerApp(store: store));
 }
 
 class HungerApp extends StatelessWidget {
-  const HungerApp({super.key});
+  final LocalStore store;
+  const HungerApp({super.key, required this.store});
 
   @override
   Widget build(BuildContext context) {
@@ -24,18 +30,28 @@ class HungerApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         Provider<ApiClient>.value(value: apiClient),
+        Provider<LocalStore>.value(value: store),
+        ChangeNotifierProvider(create: (_) => ConnectivityService()),
         ChangeNotifierProvider(create: (_) => AuthService(apiClient)),
         ChangeNotifierProvider(create: (_) => CartService()),
-        Provider(create: (_) => MenuService(apiClient)),
-        Provider(create: (_) => OrderService(apiClient)),
+        Provider(create: (_) => MenuService(apiClient, store)),
+        ChangeNotifierProvider(create: (_) => OrderService(apiClient, store)),
         Provider(create: (_) => ReportService(apiClient)),
+        ChangeNotifierProxyProvider<ConnectivityService, SyncService>(
+          create: (ctx) => SyncService(
+            apiClient,
+            store,
+            ctx.read<ConnectivityService>(),
+          ),
+          update: (_, __, prev) => prev!,
+        ),
       ],
       child: MaterialApp(
         title: 'Hunger Cafe',
         debugShowCheckedModeBanner: false,
         theme: ThemeData(
           colorScheme: ColorScheme.fromSeed(
-            seedColor: const Color(0xFF5C3A1E), // Hunger brown
+            seedColor: const Color(0xFF5C3A1E),
             brightness: Brightness.light,
           ),
           scaffoldBackgroundColor: const Color(0xFFFAF3E5),

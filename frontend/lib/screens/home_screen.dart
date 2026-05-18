@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 import '../models/user.dart';
 import '../services/auth_service.dart';
 import '../services/cart_service.dart';
+import '../services/connectivity_service.dart';
+import '../services/sync_service.dart';
 import '../widgets/brand_logo.dart';
 import '../widgets/cart_sheet.dart';
 import 'pos_screen.dart';
@@ -73,6 +75,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
         actions: [
+          const _NetworkStatusButton(),
           if (isPosTab) const _CartActionButton(),
         ],
       ),
@@ -133,6 +136,99 @@ class _BrandMenuButton extends StatelessWidget {
       child: const Padding(
         padding: EdgeInsets.symmetric(horizontal: 4, vertical: 4),
         child: BrandLogo(size: 32),
+      ),
+    );
+  }
+}
+
+class _NetworkStatusButton extends StatelessWidget {
+  const _NetworkStatusButton();
+
+  @override
+  Widget build(BuildContext context) {
+    final online = context.watch<ConnectivityService>().online;
+    final sync = context.watch<SyncService>();
+    final pending = sync.pendingCount;
+
+    final icon = online ? Icons.cloud_done_outlined : Icons.cloud_off_outlined;
+    final color = online
+        ? Theme.of(context).colorScheme.primary
+        : Theme.of(context).colorScheme.error;
+
+    return IconButton(
+      tooltip: online
+          ? (pending == 0
+              ? 'Online'
+              : '$pending order${pending == 1 ? '' : 's'} pending sync')
+          : 'Offline — orders will queue',
+      onPressed: () {
+        showModalBottomSheet(
+          context: context,
+          builder: (_) => _NetworkInfoSheet(),
+        );
+      },
+      icon: Badge(
+        isLabelVisible: pending > 0,
+        label: Text('$pending'),
+        backgroundColor: Colors.orange,
+        textColor: Colors.white,
+        child: Icon(icon, color: color),
+      ),
+    );
+  }
+}
+
+class _NetworkInfoSheet extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final online = context.watch<ConnectivityService>().online;
+    final sync = context.watch<SyncService>();
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                    online ? Icons.cloud_done_outlined : Icons.cloud_off_outlined,
+                    color: online
+                        ? Theme.of(context).colorScheme.primary
+                        : Theme.of(context).colorScheme.error),
+                const SizedBox(width: 10),
+                Text(online ? 'Online' : 'Offline',
+                    style: Theme.of(context).textTheme.titleLarge),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(online
+                ? 'The app is connected to the server. Orders charge in real time.'
+                : 'No network detected. New orders will be saved locally and synced automatically when the connection returns.'),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                const Icon(Icons.sync),
+                const SizedBox(width: 10),
+                Text('${sync.pendingCount} order(s) pending sync'),
+                const Spacer(),
+                if (online && sync.pendingCount > 0)
+                  FilledButton.tonal(
+                    onPressed: sync.isRunning ? null : sync.flush,
+                    child: Text(sync.isRunning ? 'Syncing…' : 'Sync now'),
+                  ),
+              ],
+            ),
+            if (sync.lastError != null) ...[
+              const SizedBox(height: 12),
+              Text(
+                'Last sync error: ${sync.lastError}',
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }
