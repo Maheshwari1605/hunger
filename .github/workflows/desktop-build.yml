@@ -1,0 +1,78 @@
+name: Desktop builds
+
+on:
+  workflow_dispatch:        # run manually from the Actions tab
+  push:
+    tags:
+      - 'v*'                 # also run on version tags like v0.2.0
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter --version
+      - run: flutter config --enable-windows-desktop
+      - run: flutter pub get
+      - run: flutter build windows --release --dart-define=API_BASE_URL=https://hunger-j0o0.onrender.com
+      - name: Package as zip
+        shell: pwsh
+        run: |
+          $src = "build\windows\x64\runner\Release"
+          $dst = "HungerCafe-Windows.zip"
+          Compress-Archive -Path "$src\*" -DestinationPath $dst -Force
+      - uses: actions/upload-artifact@v4
+        with:
+          name: HungerCafe-Windows
+          path: frontend/HungerCafe-Windows.zip
+
+  macos:
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter config --enable-macos-desktop
+      - run: flutter pub get
+      - run: flutter build macos --release --dart-define=API_BASE_URL=https://hunger-j0o0.onrender.com
+      - name: Package as zip
+        run: |
+          cd build/macos/Build/Products/Release
+          zip -r ../../../../../HungerCafe-macOS.zip "Hunger Cafe.app" || zip -r ../../../../../HungerCafe-macOS.zip hunger_cafe.app
+      - uses: actions/upload-artifact@v4
+        with:
+          name: HungerCafe-macOS
+          path: frontend/HungerCafe-macOS.zip
+
+  linux:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter config --enable-linux-desktop
+      - run: flutter pub get
+      - run: flutter build linux --release --dart-define=API_BASE_URL=https://hunger-j0o0.onrender.com
+      - name: Package as tarball
+        run: |
+          cd build/linux/x64/release
+          tar -czf ../../../../HungerCafe-Linux.tar.gz bundle
+      - uses: actions/upload-artifact@v4
+        with:
+          name: HungerCafe-Linux
+          path: frontend/HungerCafe-Linux.tar.gz
