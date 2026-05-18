@@ -174,6 +174,86 @@ exports.createOrder = async (req, res, next) => {
   }
 };
 
+/**
+ * Replace the contents of an open (held) order — items, customer, discount.
+ * Bill number is preserved. Server re-derives prices and totals.
+ */
+exports.updateHeldOrder = async (req, res, next) => {
+  try {
+    const order = await Order.findById(req.params.id);
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+    if (order.paymentStatus !== 'open') {
+      return res.status(400).json({ error: 'Only open orders can be updated' });
+    }
+
+    const {
+      items,
+      orderType = order.orderType,
+      discountType = order.discountType,
+      discountValue = order.discountValue,
+      customer = {},
+      tableId,
+      tableLabel,
+    } = req.body;
+
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: 'items required' });
+    }
+
+    const ids = items.map((i) => i.menuItemId);
+    const menuItems = await MenuItem.find({ _id: { $in: ids } });
+    const menuMap = new Map(menuItems.map((m) => [m._id.toString(), m]));
+
+    const orderItems = items.map((cartItem) => {
+      const menuItem = menuMap.get(String(cartItem.menuItemId));
+      if (!menuItem) {
+        const err = new Error(`Menu item not found: ${cartItem.menuItemId}`);
+        err.status = 400;
+        throw err;
+      }
+      const qty = Math.max(1, parseInt(cartItem.quantity || 1, 10));
+      return {
+        menuItemId: menuItem._id,
+        name: menuItem.name,
+        price: menuItem.price,
+        quantity: qty,
+        notes: cartItem.notes || '',
+      };
+    });
+
+    const settings = await Settings.getOrCreate(req.user.outletId);
+    const totals = computeTotals({
+      items: orderItems,
+      discountType,
+      discountValue,
+      taxRate: settings.taxRate,
+    });
+
+    order.items = orderItems;
+    order.orderType = orderType;
+    if (tableId !== undefined) order.tableId = tableId || null;
+    if (tableLabel !== undefined) order.tableLabel = tableLabel || '';
+    if (customer && (customer.name || customer.phone)) {
+      order.customer = {
+        name: customer.name || order.customer?.name || '',
+        phone: customer.phone || order.customer?.phone || '',
+        address: customer.address || order.customer?.address || '',
+      };
+    }
+    order.discountType = discountType;
+    order.discountValue = discountValue;
+    order.taxRate = settings.taxRate;
+    order.subtotal = totals.subtotal;
+    order.discount = totals.discount;
+    order.taxAmount = totals.taxAmount;
+    order.total = totals.total;
+    await order.save();
+    res.json({ order });
+  } catch (err) {
+    next(err);
+  }
+};
+
 /** Settle a previously held order (paymentStatus 'open' → 'paid'). */
 exports.settleOrder = async (req, res, next) => {
   try {

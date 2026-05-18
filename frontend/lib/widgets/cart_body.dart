@@ -65,9 +65,32 @@ class _CartBodyState extends State<CartBody> {
 
       late final order;
       if (cart.heldOrderId != null && !hold) {
-        // Settling a previously held order.
+        // Settling a previously held order — first update items in case the
+        // cashier added/removed something, then settle.
+        await orderSvc.updateHeld(
+          cart.heldOrderId!,
+          cart: cart.items,
+          orderType: cart.orderType,
+          discountType: cart.discountType,
+          discountValue: cart.discountValue,
+          customer: customerMap.isNotEmpty ? customerMap : null,
+          tableId: cart.tableId,
+          tableLabel: cart.tableLabel,
+        );
         order =
             await orderSvc.settle(cart.heldOrderId!, cart.paymentMethod);
+      } else if (cart.heldOrderId != null && hold) {
+        // Re-holding an already-held order → update in place.
+        order = await orderSvc.updateHeld(
+          cart.heldOrderId!,
+          cart: cart.items,
+          orderType: cart.orderType,
+          discountType: cart.discountType,
+          discountValue: cart.discountValue,
+          customer: customerMap.isNotEmpty ? customerMap : null,
+          tableId: cart.tableId,
+          tableLabel: cart.tableLabel,
+        );
       } else {
         order = await orderSvc.create(
           cart: cart.items,

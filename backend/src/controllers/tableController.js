@@ -1,9 +1,21 @@
 const Table = require('../models/Table');
 const Order = require('../models/Order');
 
+const DEFAULT_TABLES = ['T1', 'T2', 'T3', 'T4', 'T5', 'T6'];
+
+async function ensureDefaultTables(outletId) {
+  const count = await Table.countDocuments({ outletId });
+  if (count > 0) return;
+  await Table.insertMany(
+    DEFAULT_TABLES.map((label) => ({ label, capacity: 4, outletId })),
+    { ordered: false }
+  ).catch(() => {}); // ignore duplicate-key races
+}
+
 // Returns each active table with `occupied` derived from open (held) orders.
 exports.list = async (req, res, next) => {
   try {
+    await ensureDefaultTables(req.user.outletId);
     const tables = await Table.find({ outletId: req.user.outletId, active: true })
       .sort({ label: 1 })
       .lean();

@@ -4,6 +4,7 @@ const requireRole = require('../middleware/roles');
 const ctrl = require('../controllers/orderController');
 
 router.post('/', authenticate, requireRole('admin', 'cashier'), ctrl.createOrder);
+router.put('/:id', authenticate, requireRole('admin', 'cashier'), ctrl.updateHeldOrder);
 router.post('/:id/settle', authenticate, requireRole('admin', 'cashier'), ctrl.settleOrder);
 router.get('/', authenticate, ctrl.listOrders);
 router.get('/:id', authenticate, ctrl.getOrder);

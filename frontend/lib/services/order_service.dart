@@ -107,6 +107,34 @@ class OrderService extends ChangeNotifier {
     return OrderSummary.fromJson(res['order'] as Map<String, dynamic>);
   }
 
+  /// Replace the contents of an open order — preserves bill number.
+  Future<OrderSummary> updateHeld(
+    String orderId, {
+    required List<CartLine> cart,
+    String orderType = 'dine-in',
+    String discountType = 'fixed',
+    double discountValue = 0,
+    Map<String, String>? customer,
+    String? tableId,
+    String? tableLabel,
+  }) async {
+    final res = await _api.put('/api/orders/$orderId', {
+      'items': cart.map((c) => c.toApiJson()).toList(),
+      'orderType': orderType,
+      'discountType': discountType,
+      'discountValue': discountValue,
+      if (customer != null) 'customer': customer,
+      if (tableId != null) 'tableId': tableId,
+      if (tableLabel != null && tableLabel.isNotEmpty) 'tableLabel': tableLabel,
+    });
+    return OrderSummary.fromJson(res['order'] as Map<String, dynamic>);
+  }
+
+  Future<OrderSummary> get(String orderId) async {
+    final res = await _api.get('/api/orders/$orderId');
+    return OrderSummary.fromJson(res['order'] as Map<String, dynamic>);
+  }
+
   Future<List<OrderSummary>> list({
     DateTime? from,
     DateTime? to,
