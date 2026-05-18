@@ -1,7 +1,7 @@
 name: hunger_cafe
 description: Hunger Cafe POS & Management System (Flutter client)
 publish_to: 'none'
-version: 0.6.0+6
+version: 0.7.0+7
 
 environment:
   sdk: '>=3.3.0 <4.0.0'

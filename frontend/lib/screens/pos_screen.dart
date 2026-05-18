@@ -42,11 +42,22 @@ class _PosScreenState extends State<PosScreen> {
     if (_loadingTable) return;
     setState(() => _loadingTable = true);
     final cart = context.read<CartService>();
+    final tableId = table['_id'] as String;
+    final tableLabel = table['label'] as String;
+
     try {
-      if (table['occupied'] == true && table['openOrderId'] != null) {
-        // Resume the held order for this table.
-        final order =
-            await context.read<OrderService>().get(table['openOrderId'] as String);
+      // Activate this table's cart. If it already has unsaved items locally,
+      // we just show them — no fetch, no overwrite.
+      final hadLocal = cart.hasLocalItemsFor(tableId);
+      cart.selectTable(id: tableId, label: tableLabel);
+
+      if (!hadLocal &&
+          table['occupied'] == true &&
+          table['openOrderId'] != null) {
+        // No local WIP for this table, but the server has a held order — load it.
+        final order = await context
+            .read<OrderService>()
+            .get(table['openOrderId'] as String);
         final menu = await context.read<MenuService>().list();
         final byName = {for (final m in menu) m.name: m};
         final lines = <CartLine>[];
@@ -68,10 +79,6 @@ class _PosScreenState extends State<PosScreen> {
         }
         if (!mounted) return;
         cart.loadFromOrder(order, lines);
-      } else {
-        // Fresh order for this table.
-        cart.clear();
-        cart.setTable(id: table['_id'] as String, label: table['label'] as String);
       }
       if (!mounted) return;
       setState(() => _activeTable = table);
@@ -84,67 +91,11 @@ class _PosScreenState extends State<PosScreen> {
     }
   }
 
-  Future<bool> _confirmExitIfDirty() async {
-    final cart = context.read<CartService>();
-    if (cart.isEmpty) return true;
-    if (cart.heldOrderId != null) {
-      // Order is already in DB; cashier just navigated away — silently allow,
-      // they can come back and edits aren't lost (we re-fetch on next select).
-      return true;
-    }
-    final action = await showDialog<String>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Save this order?'),
-        content: Text(
-            'You have ${cart.count} item(s) in the cart for ${_activeTable?["label"] ?? "this table"}. Hold the order to save it, or discard to clear.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, 'discard'),
-            child: const Text('Discard'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, 'cancel'),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, 'hold'),
-            child: const Text('Hold'),
-          ),
-        ],
-      ),
-    );
-    if (action == 'cancel' || action == null) return false;
-    if (action == 'discard') {
-      cart.clear();
-      return true;
-    }
-    // hold path
-    try {
-      await context.read<OrderService>().create(
-            cart: cart.items,
-            paymentMethod: cart.paymentMethod,
-            orderType: cart.orderType,
-            discountType: cart.discountType,
-            discountValue: cart.discountValue,
-            tableId: cart.tableId,
-            tableLabel: cart.tableLabel,
-            hold: true,
-          );
-      cart.clear();
-      return true;
-    } catch (e) {
-      if (!mounted) return false;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Hold failed: $e')));
-      return false;
-    }
-  }
-
-  Future<void> _backToTables() async {
-    final ok = await _confirmExitIfDirty();
-    if (!ok) return;
-    if (!mounted) return;
+  /// Per-table carts are preserved in memory automatically, so going back
+  /// is non-destructive — the cashier can return to this table later and
+  /// see exactly what was on screen. They only need to Hold (or Charge) when
+  /// they want to push to the server.
+  void _backToTables() {
     setState(() => _activeTable = null);
     _reloadTables();
   }
@@ -228,20 +179,45 @@ class _TablesGridView extends StatelessWidget {
                         itemBuilder: (context, i) {
                           final t = tables[i];
                           final occupied = t['occupied'] == true;
+                          final hasWip = context.select<CartService, bool>(
+                            (c) => c.hasLocalItemsFor(t['_id'] as String?),
+                          );
+                          final Color tileColor;
+                          final Color borderColor;
+                          final String statusLabel;
+                          final Color statusColor;
+                          final IconData icon;
+                          if (occupied) {
+                            tileColor = Colors.orange.shade50;
+                            borderColor = Colors.orange;
+                            statusLabel = 'In progress';
+                            statusColor = Colors.orange.shade800;
+                            icon = Icons.restaurant;
+                          } else if (hasWip) {
+                            tileColor = Colors.amber.shade50;
+                            borderColor = Colors.amber.shade600;
+                            statusLabel = 'Draft';
+                            statusColor = Colors.amber.shade800;
+                            icon = Icons.edit_note;
+                          } else {
+                            tileColor =
+                                Theme.of(context).colorScheme.surface;
+                            borderColor = Colors.black12;
+                            statusLabel = 'Free';
+                            statusColor = Colors.green.shade800;
+                            icon = Icons.table_restaurant;
+                          }
                           return InkWell(
                             onTap: () => onTap(t),
                             borderRadius: BorderRadius.circular(14),
                             child: Card(
-                              color: occupied
-                                  ? Colors.orange.shade50
-                                  : Theme.of(context).colorScheme.surface,
+                              color: tileColor,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(14),
                                 side: BorderSide(
-                                  color: occupied
-                                      ? Colors.orange
-                                      : Colors.black12,
-                                  width: occupied ? 1.5 : 1,
+                                  color: borderColor,
+                                  width:
+                                      occupied || hasWip ? 1.5 : 1,
                                 ),
                               ),
                               child: Padding(
@@ -250,13 +226,13 @@ class _TablesGridView extends StatelessWidget {
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
                                     Icon(
-                                      occupied
-                                          ? Icons.restaurant
-                                          : Icons.table_restaurant,
+                                      icon,
                                       size: 38,
-                                      color: occupied
-                                          ? Colors.orange.shade800
-                                          : Theme.of(context).colorScheme.primary,
+                                      color: occupied || hasWip
+                                          ? statusColor
+                                          : Theme.of(context)
+                                              .colorScheme
+                                              .primary,
                                     ),
                                     const SizedBox(height: 8),
                                     Text(
@@ -266,11 +242,9 @@ class _TablesGridView extends StatelessWidget {
                                           .titleLarge,
                                     ),
                                     Text(
-                                      occupied ? 'In progress' : 'Free',
+                                      statusLabel,
                                       style: TextStyle(
-                                        color: occupied
-                                            ? Colors.orange.shade800
-                                            : Colors.green.shade800,
+                                        color: statusColor,
                                         fontSize: 12,
                                       ),
                                     ),
