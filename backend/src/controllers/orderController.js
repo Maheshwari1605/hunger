@@ -1,18 +1,80 @@
 const Order = require('../models/Order');
 const MenuItem = require('../models/MenuItem');
+const Customer = require('../models/Customer');
+const Settings = require('../models/Settings');
+
+function startOfDay(d = new Date()) {
+  const s = new Date(d);
+  s.setHours(0, 0, 0, 0);
+  return s;
+}
+
+// Per-outlet, per-day running bill number.
+async function nextBillNumber(outletId) {
+  const since = startOfDay();
+  const count = await Order.countDocuments({
+    outletId,
+    createdAt: { $gte: since },
+  });
+  return `B${String(count + 1).padStart(4, '0')}`;
+}
+
+function computeTotals({ items, discountType, discountValue, taxRate }) {
+  const subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0);
+  let discount = 0;
+  if (discountType === 'percent') {
+    discount = Math.min(subtotal, subtotal * (Number(discountValue) || 0) / 100);
+  } else {
+    discount = Math.min(subtotal, Number(discountValue) || 0);
+  }
+  const taxableBase = Math.max(0, subtotal - discount);
+  const taxAmount = +(taxableBase * taxRate).toFixed(2);
+  const total = +(taxableBase + taxAmount).toFixed(2);
+  return {
+    subtotal: +subtotal.toFixed(2),
+    discount: +discount.toFixed(2),
+    taxAmount,
+    total,
+  };
+}
+
+async function upsertCustomer({ outletId, name, phone, address }) {
+  if (!phone || !name) return null;
+  return Customer.findOneAndUpdate(
+    { outletId, phone: phone.trim() },
+    {
+      $set: {
+        name: name.trim(),
+        ...(address ? { address } : {}),
+      },
+    },
+    { upsert: true, new: true, setDefaultsOnInsert: true }
+  );
+}
 
 /**
- * Build an order from cart items. Server re-derives prices from the menu
- * so the client cannot tamper with item pricing.
+ * Build/save an order. If `hold` is true, paymentStatus='open' and paymentMethod is blank.
+ * Otherwise behaves like a normal sale.
  */
 exports.createOrder = async (req, res, next) => {
   try {
-    const { items, paymentMethod, discount = 0, taxRate, customer } = req.body;
+    const {
+      items,
+      orderType = 'dine-in',
+      paymentMethod,
+      discountType = 'fixed',
+      discountValue = 0,
+      customer = {},
+      tableId,
+      tableLabel,
+      hold = false,
+    } = req.body;
+
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: 'items required' });
     }
-    if (!paymentMethod) {
-      return res.status(400).json({ error: 'paymentMethod required' });
+    if (!hold && !paymentMethod) {
+      return res.status(400).json({ error: 'paymentMethod required (or set hold:true)' });
     }
 
     const ids = items.map((i) => i.menuItemId);
@@ -41,37 +103,70 @@ exports.createOrder = async (req, res, next) => {
       };
     });
 
-    const subtotal = orderItems.reduce((s, i) => s + i.price * i.quantity, 0);
-    const effectiveTaxRate = typeof taxRate === 'number' ? taxRate : 0.05;
-    const taxableBase = Math.max(0, subtotal - discount);
-    const taxAmount = +(taxableBase * effectiveTaxRate).toFixed(2);
-    const total = +(taxableBase + taxAmount).toFixed(2);
+    const settings = await Settings.getOrCreate(req.user.outletId);
+    const totals = computeTotals({
+      items: orderItems,
+      discountType,
+      discountValue,
+      taxRate: settings.taxRate,
+    });
+
+    const cust = await upsertCustomer({
+      outletId: req.user.outletId,
+      name: customer.name,
+      phone: customer.phone,
+      address: customer.address,
+    });
+
+    const billNumber = await nextBillNumber(req.user.outletId);
 
     const order = await Order.create({
+      billNumber,
+      orderType,
+      tableId: tableId || null,
+      tableLabel: tableLabel || '',
+      customerId: cust ? cust._id : null,
+      customer: {
+        name: customer.name || (cust ? cust.name : ''),
+        phone: customer.phone || (cust ? cust.phone : ''),
+        address: customer.address || '',
+      },
       items: orderItems,
-      subtotal: +subtotal.toFixed(2),
-      discount,
-      taxRate: effectiveTaxRate,
-      taxAmount,
-      total,
-      paymentMethod,
+      ...totals,
+      discountType,
+      discountValue,
+      taxRate: settings.taxRate,
+      paymentMethod: hold ? '' : paymentMethod,
+      paymentStatus: hold ? 'open' : 'paid',
       cashierId: req.user._id,
       cashierName: req.user.name,
       outletId: req.user.outletId,
-      customer: customer || {},
     });
 
-    // Decrement stock where tracked
-    await Promise.all(
-      orderItems
-        .filter((i) => menuMap.get(String(i.menuItemId)).stock !== null)
-        .map((i) =>
-          MenuItem.updateOne(
-            { _id: i.menuItemId },
-            { $inc: { stock: -i.quantity } }
+    // Bump customer stats only when actually paid.
+    if (cust && !hold) {
+      await Customer.updateOne(
+        { _id: cust._id },
+        {
+          $inc: { totalOrders: 1, totalSpent: totals.total },
+          $set: { lastOrderAt: new Date() },
+        }
+      );
+    }
+
+    // Decrement tracked stock only on paid orders.
+    if (!hold) {
+      await Promise.all(
+        orderItems
+          .filter((i) => menuMap.get(String(i.menuItemId)).stock !== null)
+          .map((i) =>
+            MenuItem.updateOne(
+              { _id: i.menuItemId },
+              { $inc: { stock: -i.quantity } }
+            )
           )
-        )
-    );
+      );
+    }
 
     res.status(201).json({ order });
   } catch (err) {
@@ -79,10 +174,39 @@ exports.createOrder = async (req, res, next) => {
   }
 };
 
+/** Settle a previously held order (paymentStatus 'open' → 'paid'). */
+exports.settleOrder = async (req, res, next) => {
+  try {
+    const { paymentMethod } = req.body;
+    if (!paymentMethod) return res.status(400).json({ error: 'paymentMethod required' });
+    const order = await Order.findById(req.params.id);
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+    if (order.paymentStatus !== 'open') {
+      return res.status(400).json({ error: 'Order is not open' });
+    }
+    order.paymentMethod = paymentMethod;
+    order.paymentStatus = 'paid';
+    await order.save();
+    // Bump customer stats now that it's paid.
+    if (order.customerId) {
+      await Customer.updateOne(
+        { _id: order.customerId },
+        {
+          $inc: { totalOrders: 1, totalSpent: order.total },
+          $set: { lastOrderAt: new Date() },
+        }
+      );
+    }
+    res.json({ order });
+  } catch (err) {
+    next(err);
+  }
+};
+
 exports.listOrders = async (req, res, next) => {
   try {
-    const { from, to, status, kitchenStatus, limit = 50 } = req.query;
-    const filter = {};
+    const { from, to, status, kitchenStatus, orderType, limit = 50 } = req.query;
+    const filter = { outletId: req.user.outletId };
     if (from || to) {
       filter.createdAt = {};
       if (from) filter.createdAt.$gte = new Date(from);
@@ -90,6 +214,7 @@ exports.listOrders = async (req, res, next) => {
     }
     if (status) filter.paymentStatus = status;
     if (kitchenStatus) filter.kitchenStatus = kitchenStatus;
+    if (orderType) filter.orderType = orderType;
 
     const orders = await Order.find(filter)
       .sort({ createdAt: -1 })

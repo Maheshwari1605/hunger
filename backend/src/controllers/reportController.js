@@ -149,3 +149,114 @@ exports.paymentMixSummary = async (req, res, next) => {
     next(err);
   }
 };
+
+function rangeMatch(req) {
+  const { from, to } = req.query;
+  const match = { ...PAID_FILTER, outletId: req.user.outletId };
+  if (from || to) {
+    match.createdAt = {};
+    if (from) match.createdAt.$gte = new Date(from);
+    if (to) match.createdAt.$lte = new Date(to);
+  }
+  return match;
+}
+
+exports.categorySummary = async (req, res, next) => {
+  try {
+    const match = rangeMatch(req);
+    const rows = await Order.aggregate([
+      { $match: match },
+      { $unwind: '$items' },
+      {
+        $lookup: {
+          from: 'menuitems',
+          localField: 'items.menuItemId',
+          foreignField: '_id',
+          as: 'mi',
+        },
+      },
+      { $unwind: { path: '$mi', preserveNullAndEmptyArrays: true } },
+      {
+        $group: {
+          _id: { $ifNull: ['$mi.category', 'Uncategorized'] },
+          quantity: { $sum: '$items.quantity' },
+          revenue: { $sum: { $multiply: ['$items.price', '$items.quantity'] } },
+        },
+      },
+      { $sort: { revenue: -1 } },
+    ]);
+    res.json({ rows });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.itemSummary = async (req, res, next) => {
+  try {
+    const match = rangeMatch(req);
+    const rows = await Order.aggregate([
+      { $match: match },
+      { $unwind: '$items' },
+      {
+        $group: {
+          _id: '$items.menuItemId',
+          name: { $first: '$items.name' },
+          quantity: { $sum: '$items.quantity' },
+          revenue: { $sum: { $multiply: ['$items.price', '$items.quantity'] } },
+        },
+      },
+      { $sort: { quantity: -1 } },
+    ]);
+    res.json({ rows });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.orderSummary = async (req, res, next) => {
+  try {
+    const match = rangeMatch(req);
+    const rows = await Order.aggregate([
+      { $match: match },
+      {
+        $group: {
+          _id: '$orderType',
+          orders: { $sum: 1 },
+          revenue: { $sum: '$total' },
+          avgTicket: { $avg: '$total' },
+        },
+      },
+      { $sort: { revenue: -1 } },
+    ]);
+    res.json({ rows });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.employeeSummary = async (req, res, next) => {
+  try {
+    const match = rangeMatch(req);
+    const rows = await Order.aggregate([
+      { $match: match },
+      {
+        $group: {
+          _id: { id: '$cashierId', name: '$cashierName' },
+          orders: { $sum: 1 },
+          revenue: { $sum: '$total' },
+        },
+      },
+      { $sort: { revenue: -1 } },
+    ]);
+    res.json({
+      rows: rows.map((r) => ({
+        cashierId: r._id.id,
+        cashierName: r._id.name,
+        orders: r.orders,
+        revenue: r.revenue,
+      })),
+    });
+  } catch (err) {
+    next(err);
+  }
+};

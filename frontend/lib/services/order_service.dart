@@ -29,14 +29,24 @@ class OrderService extends ChangeNotifier {
   Future<OrderSummary> create({
     required List<CartLine> cart,
     required String paymentMethod,
-    double discount = 0,
+    String orderType = 'dine-in',
+    String discountType = 'fixed',
+    double discountValue = 0,
     Map<String, String>? customer,
+    String? tableId,
+    String? tableLabel,
+    bool hold = false,
   }) async {
     final payload = {
       'items': cart.map((c) => c.toApiJson()).toList(),
-      'paymentMethod': paymentMethod,
-      'discount': discount,
+      'orderType': orderType,
+      if (!hold) 'paymentMethod': paymentMethod,
+      'discountType': discountType,
+      'discountValue': discountValue,
       if (customer != null) 'customer': customer,
+      if (tableId != null) 'tableId': tableId,
+      if (tableLabel != null && tableLabel.isNotEmpty) 'tableLabel': tableLabel,
+      if (hold) 'hold': true,
     };
 
     try {
@@ -49,8 +59,15 @@ class OrderService extends ChangeNotifier {
       final localId = DateTime.now().millisecondsSinceEpoch.toString();
       final subtotal =
           cart.fold<double>(0, (s, c) => s + c.item.price * c.quantity);
+      double discount = 0;
+      if (discountType == 'percent') {
+        discount = subtotal * (discountValue / 100);
+      } else {
+        discount = discountValue;
+      }
+      if (discount > subtotal) discount = subtotal;
       final taxableBase = (subtotal - discount).clamp(0, double.infinity);
-      final tax = taxableBase * 0.05;
+      final tax = taxableBase * 0.05; // best-effort offline; server re-prices on sync
       final total = taxableBase + tax;
 
       await _store.enqueueOrder({
@@ -75,8 +92,19 @@ class OrderService extends ChangeNotifier {
         discount: discount,
         total: total.toDouble(),
         paymentMethod: paymentMethod,
+        orderType: orderType,
+        customerName: customer?['name'],
+        customerPhone: customer?['phone'],
       );
     }
+  }
+
+  /// Settle a held (paymentStatus='open') order.
+  Future<OrderSummary> settle(String orderId, String paymentMethod) async {
+    final res = await _api.post('/api/orders/$orderId/settle', {
+      'paymentMethod': paymentMethod,
+    });
+    return OrderSummary.fromJson(res['order'] as Map<String, dynamic>);
   }
 
   Future<List<OrderSummary>> list({

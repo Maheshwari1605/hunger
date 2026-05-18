@@ -10,6 +10,10 @@ const authRoutes = require('./routes/auth');
 const menuRoutes = require('./routes/menu');
 const orderRoutes = require('./routes/orders');
 const reportRoutes = require('./routes/reports');
+const customerRoutes = require('./routes/customers');
+const tableRoutes = require('./routes/tables');
+const cashRoutes = require('./routes/cash');
+const settingsRoutes = require('./routes/settings');
 
 const app = express();
 
@@ -60,6 +64,10 @@ app.use('/api/auth', authRoutes);
 app.use('/api/menu', menuRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/customers', customerRoutes);
+app.use('/api/tables', tableRoutes);
+app.use('/api/cash', cashRoutes);
+app.use('/api/settings', settingsRoutes);
 
 // 404
 app.use((req, res) => res.status(404).json({ error: 'Route not found' }));

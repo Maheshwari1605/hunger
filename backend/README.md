@@ -55,11 +55,44 @@ Excel columns (case-insensitive): `name, category, price, sku, description, tags
 - `PATCH /api/orders/:id/kitchen` — **admin/kitchen** — `{ kitchenStatus: queued|preparing|ready|served }`
 - `PATCH /api/orders/:id/void` — **admin**
 
+### Orders (continued)
+- `POST  /api/orders/:id/settle` — settle a held order with `{ paymentMethod }`. **admin/cashier**.
+
+When `hold: true` is included on order create, the order is saved with `paymentStatus: 'open'`, the kitchen still sees it, but customer stats and stock decrements are deferred until settle. Discount supports `discountType: 'fixed' | 'percent'` with a numeric `discountValue`.
+
+### Customers
+- `GET    /api/customers` (search by `?q=`)
+- `GET    /api/customers/lookup?phone=...`
+- `POST   /api/customers` — **admin/cashier** — upsert by phone
+- `PUT    /api/customers/:id` — **admin**
+- `DELETE /api/customers/:id` — **admin**
+
+### Tables
+- `GET    /api/tables` — returns each table with `occupied` derived from open orders
+- `POST   /api/tables` — **admin** — `{ label, capacity }`
+- `PUT    /api/tables/:id` — **admin**
+- `DELETE /api/tables/:id` — **admin**
+
+### Cash session
+- `GET    /api/cash/current` — current open session + running totals (cash sales, expenses, withdrawals, expected drawer)
+- `POST   /api/cash/open` — **admin/cashier** — `{ openingBalance }`
+- `POST   /api/cash/close` — **admin/cashier** — `{ closingBalance }`
+- `POST   /api/cash/entry` — **admin/cashier** — `{ type: expense|withdrawal|topup, amount, note }`
+- `GET    /api/cash/history` — **admin** — closed sessions
+
+### Settings
+- `GET /api/settings` — outlet settings (tax rate, cafe name, address, GST, etc.)
+- `PUT /api/settings` — **admin** — partial update
+
 ### Reports (admin only)
 - `GET /api/reports/daily?date=YYYY-MM-DD`
 - `GET /api/reports/monthly?month=YYYY-MM`
 - `GET /api/reports/best-selling?from=&to=&limit=`
 - `GET /api/reports/payment-mix?from=&to=`
+- `GET /api/reports/category-summary?from=&to=`
+- `GET /api/reports/item-summary?from=&to=`
+- `GET /api/reports/order-summary?from=&to=`
+- `GET /api/reports/employee-summary?from=&to=`
 
 ## Architecture notes
 

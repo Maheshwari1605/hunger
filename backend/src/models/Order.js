@@ -14,21 +14,39 @@ const orderItemSchema = new mongoose.Schema(
 const orderSchema = new mongoose.Schema(
   {
     orderNumber: { type: String, unique: true, index: true },
+    billNumber: { type: String, index: true }, // sequential per outlet per day
+    orderType: {
+      type: String,
+      enum: ['dine-in', 'delivery', 'pick-up'],
+      default: 'dine-in',
+      index: true,
+    },
+    tableId: { type: mongoose.Schema.Types.ObjectId, ref: 'Table', default: null },
+    tableLabel: { type: String, default: '' }, // denormalized for display
+    customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer', default: null },
+    customer: {
+      name: { type: String, default: '' },
+      phone: { type: String, default: '' },
+      address: { type: String, default: '' }, // for delivery
+    },
     items: { type: [orderItemSchema], validate: (v) => v.length > 0 },
     subtotal: { type: Number, required: true, min: 0 },
-    taxRate: { type: Number, default: 0.05 }, // 5% default
+    discountType: { type: String, enum: ['fixed', 'percent'], default: 'fixed' },
+    discountValue: { type: Number, default: 0, min: 0 },
+    discount: { type: Number, default: 0, min: 0 }, // computed absolute amount
+    taxRate: { type: Number, default: 0.05 },
     taxAmount: { type: Number, required: true, min: 0 },
-    discount: { type: Number, default: 0, min: 0 },
     total: { type: Number, required: true, min: 0 },
     paymentMethod: {
       type: String,
-      enum: ['cash', 'card', 'upi', 'wallet'],
-      required: true,
+      enum: ['cash', 'card', 'upi', 'wallet', ''],
+      default: '',
     },
     paymentStatus: {
       type: String,
-      enum: ['paid', 'pending', 'refunded', 'void'],
+      enum: ['open', 'paid', 'pending', 'refunded', 'void'],
       default: 'paid',
+      index: true,
     },
     kitchenStatus: {
       type: String,
@@ -37,10 +55,6 @@ const orderSchema = new mongoose.Schema(
     },
     cashierId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     cashierName: { type: String, default: '' },
-    customer: {
-      name: { type: String, default: '' },
-      phone: { type: String, default: '' },
-    },
     outletId: { type: String, default: 'default', index: true },
   },
   { timestamps: true }
@@ -48,7 +62,6 @@ const orderSchema = new mongoose.Schema(
 
 orderSchema.pre('validate', function (next) {
   if (!this.orderNumber) {
-    // Sortable, human-friendly: yymmdd-randomShort
     const d = new Date();
     const pad = (n) => String(n).padStart(2, '0');
     const stamp = `${String(d.getFullYear()).slice(2)}${pad(d.getMonth() + 1)}${pad(d.getDate())}`;

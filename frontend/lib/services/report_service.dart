@@ -43,4 +43,30 @@ class ReportService {
     return ((res as Map<String, dynamic>)['mix'] as List)
         .cast<Map<String, dynamic>>();
   }
+
+  Future<List<Map<String, dynamic>>> _rangeReport(String path,
+      {DateTime? from, DateTime? to}) async {
+    final res = await _api.get(path, query: {
+      if (from != null) 'from': from.toIso8601String(),
+      if (to != null) 'to': to.toIso8601String(),
+    });
+    return ((res as Map<String, dynamic>)['rows'] as List)
+        .cast<Map<String, dynamic>>();
+  }
+
+  Future<List<Map<String, dynamic>>> categorySummary(
+          {DateTime? from, DateTime? to}) =>
+      _rangeReport('/api/reports/category-summary', from: from, to: to);
+
+  Future<List<Map<String, dynamic>>> itemSummary(
+          {DateTime? from, DateTime? to}) =>
+      _rangeReport('/api/reports/item-summary', from: from, to: to);
+
+  Future<List<Map<String, dynamic>>> orderSummary(
+          {DateTime? from, DateTime? to}) =>
+      _rangeReport('/api/reports/order-summary', from: from, to: to);
+
+  Future<List<Map<String, dynamic>>> employeeSummary(
+          {DateTime? from, DateTime? to}) =>
+      _rangeReport('/api/reports/employee-summary', from: from, to: to);
 }

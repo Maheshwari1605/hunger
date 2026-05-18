@@ -4,12 +4,16 @@ import 'package:provider/provider.dart';
 import 'services/api_client.dart';
 import 'services/auth_service.dart';
 import 'services/cart_service.dart';
+import 'services/cash_service.dart';
 import 'services/connectivity_service.dart';
+import 'services/customer_service.dart';
 import 'services/local_store.dart';
 import 'services/menu_service.dart';
 import 'services/order_service.dart';
 import 'services/report_service.dart';
+import 'services/settings_service.dart';
 import 'services/sync_service.dart';
+import 'services/table_service.dart';
 import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
 
@@ -34,7 +38,11 @@ class HungerApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => ConnectivityService()),
         ChangeNotifierProvider(create: (_) => AuthService(apiClient)),
         ChangeNotifierProvider(create: (_) => CartService()),
+        ChangeNotifierProvider(create: (_) => SettingsService(apiClient)),
+        ChangeNotifierProvider(create: (_) => CashService(apiClient)),
         Provider(create: (_) => MenuService(apiClient, store)),
+        Provider(create: (_) => CustomerService(apiClient)),
+        Provider(create: (_) => TableService(apiClient)),
         ChangeNotifierProvider(create: (_) => OrderService(apiClient, store)),
         Provider(create: (_) => ReportService(apiClient)),
         ChangeNotifierProxyProvider<ConnectivityService, SyncService>(
@@ -80,7 +88,19 @@ class _AppEntryState extends State<_AppEntry> {
   @override
   void initState() {
     super.initState();
-    _restore = context.read<AuthService>().restore();
+    _restore = _bootstrap();
+  }
+
+  Future<void> _bootstrap() async {
+    await context.read<AuthService>().restore();
+    if (!mounted) return;
+    if (context.read<AuthService>().isAuthenticated) {
+      final settings = context.read<SettingsService>();
+      await settings.load();
+      if (!mounted) return;
+      context.read<CartService>().setTaxRate(settings.taxRate);
+      await context.read<CashService>().refresh();
+    }
   }
 
   @override
