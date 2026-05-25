@@ -10,6 +10,11 @@ router.post('/login', ctrl.login);
 router.post('/register', ctrl.register);
 
 router.get('/me', authenticate, ctrl.me);
+router.post('/change-password', authenticate, ctrl.changePassword);
+
+// Admin-only user management.
 router.get('/users', authenticate, requireRole('admin'), ctrl.listUsers);
+router.post('/users', authenticate, requireRole('admin'), ctrl.createUser);
+router.put('/users/:id', authenticate, requireRole('admin'), ctrl.updateUser);
 
 module.exports = router;

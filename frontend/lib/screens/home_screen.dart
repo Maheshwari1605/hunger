@@ -15,6 +15,7 @@ import 'customers_screen.dart';
 import 'tables_screen.dart';
 import 'cash_session_screen.dart';
 import 'settings_screen.dart';
+import 'change_password_screen.dart';
 
 class _NavTab {
   final IconData icon;
@@ -122,6 +123,17 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     const Divider(),
                     ListTile(
+                      leading: const Icon(Icons.lock_outline),
+                      title: const Text('Change password'),
+                      onTap: () {
+                        Navigator.of(context).pop(); // close drawer
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                              builder: (_) => const ChangePasswordScreen()),
+                        );
+                      },
+                    ),
+                    ListTile(
                       leading: const Icon(Icons.logout),
                       title: const Text('Logout'),
                       onTap: () => context.read<AuthService>().logout(),
@@ -188,6 +200,16 @@ class _BrandMenuButton extends StatelessWidget {
         ),
         const PopupMenuDivider(),
         const PopupMenuItem<String>(
+          value: 'change-password',
+          child: Row(
+            children: [
+              Icon(Icons.lock_outline, size: 20),
+              SizedBox(width: 12),
+              Text('Change password'),
+            ],
+          ),
+        ),
+        const PopupMenuItem<String>(
           value: 'logout',
           child: Row(
             children: [
@@ -201,6 +223,10 @@ class _BrandMenuButton extends StatelessWidget {
       onSelected: (value) {
         if (value == 'logout') {
           context.read<AuthService>().logout();
+        } else if (value == 'change-password') {
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const ChangePasswordScreen()),
+          );
         }
       },
       child: const Padding(

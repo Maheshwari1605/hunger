@@ -14,6 +14,7 @@ import 'services/report_service.dart';
 import 'services/settings_service.dart';
 import 'services/sync_service.dart';
 import 'services/table_service.dart';
+import 'services/user_service.dart';
 import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
 
@@ -45,6 +46,7 @@ class HungerApp extends StatelessWidget {
         Provider(create: (_) => TableService(apiClient)),
         ChangeNotifierProvider(create: (_) => OrderService(apiClient, store)),
         Provider(create: (_) => ReportService(apiClient)),
+        Provider(create: (_) => UserService(apiClient)),
         ChangeNotifierProxyProvider<ConnectivityService, SyncService>(
           create: (ctx) => SyncService(
             apiClient,

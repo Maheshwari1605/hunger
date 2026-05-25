@@ -97,29 +97,55 @@ class _PosScreenState extends State<PosScreen> {
     }
   }
 
+  /// Whether this PosScreen was pushed as its own route (vs. embedded as a
+  /// HomeScreen tab body). When pushed, we provide our own Scaffold so the
+  /// child widgets find a Material ancestor, and the in-page back button
+  /// pops the route rather than going to the tables grid.
+  bool get _isPushed => widget.initialTable != null;
+
   /// Per-table carts are preserved in memory automatically, so going back
   /// is non-destructive — the cashier can return to this table later and
   /// see exactly what was on screen. They only need to Hold (or Charge) when
   /// they want to push to the server.
   void _backToTables() {
+    if (_isPushed) {
+      // Pushed flow (e.g., opened from Held tab): the back button should
+      // leave POS entirely instead of going to the tables grid.
+      Navigator.of(context).maybePop();
+      return;
+    }
     setState(() => _activeTable = null);
     _reloadTables();
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_activeTable == null) {
-      return _TablesGridView(
-        future: _tablesFuture!,
-        onTap: _selectTable,
-        loading: _loadingTable,
-        onRefresh: _reloadTables,
+    final body = _activeTable == null
+        ? _TablesGridView(
+            future: _tablesFuture!,
+            onTap: _selectTable,
+            loading: _loadingTable,
+            onRefresh: _reloadTables,
+          )
+        : _TableOrderView(
+            table: _activeTable!,
+            onBack: _backToTables,
+          );
+
+    if (_isPushed) {
+      // Pushed as a standalone route — provide our own Scaffold so widgets
+      // like TextField find a Material ancestor.
+      final label = _activeTable?['label'];
+      return Scaffold(
+        appBar: AppBar(
+          title: Text(label is String && label.isNotEmpty
+              ? 'Table $label'
+              : 'POS'),
+        ),
+        body: body,
       );
     }
-    return _TableOrderView(
-      table: _activeTable!,
-      onBack: _backToTables,
-    );
+    return body;
   }
 }
 

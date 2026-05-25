@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../services/settings_service.dart';
+import 'users_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -109,6 +110,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 )
               : const Icon(Icons.save),
           label: Text(_saving ? 'Saving…' : 'Save'),
+        ),
+        const SizedBox(height: 28),
+        Text('Staff', style: Theme.of(context).textTheme.titleLarge),
+        const SizedBox(height: 8),
+        Card(
+          child: ListTile(
+            leading: const Icon(Icons.group_outlined),
+            title: const Text('Manage users'),
+            subtitle: const Text('Add cashier / kitchen / admin accounts'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const UsersScreen()),
+            ),
+          ),
         ),
       ],
     );
