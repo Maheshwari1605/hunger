@@ -19,7 +19,9 @@ async function nextBillNumber(outletId) {
   return `B${String(count + 1).padStart(4, '0')}`;
 }
 
-function computeTotals({ items, discountType, discountValue, taxRate }) {
+function computeTotals({ items, discountType, discountValue }) {
+  // Tax-free POS — taxRate is always 0. We keep the field on the response
+  // for backward compatibility with older clients that still read it.
   const subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0);
   let discount = 0;
   if (discountType === 'percent') {
@@ -28,12 +30,11 @@ function computeTotals({ items, discountType, discountValue, taxRate }) {
     discount = Math.min(subtotal, Number(discountValue) || 0);
   }
   const taxableBase = Math.max(0, subtotal - discount);
-  const taxAmount = +(taxableBase * taxRate).toFixed(2);
-  const total = +(taxableBase + taxAmount).toFixed(2);
+  const total = +taxableBase.toFixed(2);
   return {
     subtotal: +subtotal.toFixed(2),
     discount: +discount.toFixed(2),
-    taxAmount,
+    taxAmount: 0,
     total,
   };
 }
@@ -103,12 +104,12 @@ exports.createOrder = async (req, res, next) => {
       };
     });
 
-    const settings = await Settings.getOrCreate(req.user.outletId);
+    // Settings read kept for cafeName/etc. side effects; taxRate is ignored.
+    await Settings.getOrCreate(req.user.outletId);
     const totals = computeTotals({
       items: orderItems,
       discountType,
       discountValue,
-      taxRate: settings.taxRate,
     });
 
     const cust = await upsertCustomer({
@@ -135,7 +136,7 @@ exports.createOrder = async (req, res, next) => {
       ...totals,
       discountType,
       discountValue,
-      taxRate: settings.taxRate,
+      taxRate: 0,
       paymentMethod: hold ? '' : paymentMethod,
       paymentStatus: hold ? 'open' : 'paid',
       cashierId: req.user._id,
@@ -221,12 +222,10 @@ exports.updateHeldOrder = async (req, res, next) => {
       };
     });
 
-    const settings = await Settings.getOrCreate(req.user.outletId);
     const totals = computeTotals({
       items: orderItems,
       discountType,
       discountValue,
-      taxRate: settings.taxRate,
     });
 
     order.items = orderItems;
@@ -242,7 +241,7 @@ exports.updateHeldOrder = async (req, res, next) => {
     }
     order.discountType = discountType;
     order.discountValue = discountValue;
-    order.taxRate = settings.taxRate;
+    order.taxRate = 0;
     order.subtotal = totals.subtotal;
     order.discount = totals.discount;
     order.taxAmount = totals.taxAmount;

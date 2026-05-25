@@ -34,8 +34,9 @@ const orderSchema = new mongoose.Schema(
     discountType: { type: String, enum: ['fixed', 'percent'], default: 'fixed' },
     discountValue: { type: Number, default: 0, min: 0 },
     discount: { type: Number, default: 0, min: 0 }, // computed absolute amount
-    taxRate: { type: Number, default: 0.05 },
-    taxAmount: { type: Number, required: true, min: 0 },
+    // Tax-free POS — both fields kept for backward compatibility but always 0.
+    taxRate: { type: Number, default: 0 },
+    taxAmount: { type: Number, required: true, min: 0, default: 0 },
     total: { type: Number, required: true, min: 0 },
     paymentMethod: {
       type: String,

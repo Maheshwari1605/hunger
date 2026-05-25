@@ -14,7 +14,12 @@ import '../widgets/cart_sheet.dart';
 const double kWideLayoutBreakpoint = 900;
 
 class PosScreen extends StatefulWidget {
-  const PosScreen({super.key});
+  /// When set (e.g., the user opened POS by tapping a held order), skip the
+  /// tables grid and go straight into this table's order view. The cart for
+  /// the table is expected to already be populated by the caller.
+  final Map<String, dynamic>? initialTable;
+
+  const PosScreen({super.key, this.initialTable});
 
   @override
   State<PosScreen> createState() => _PosScreenState();
@@ -29,6 +34,7 @@ class _PosScreenState extends State<PosScreen> {
   @override
   void initState() {
     super.initState();
+    _activeTable = widget.initialTable;
     _reloadTables();
   }
 
@@ -178,80 +184,9 @@ class _TablesGridView extends StatelessWidget {
                         itemCount: tables.length,
                         itemBuilder: (context, i) {
                           final t = tables[i];
-                          final occupied = t['occupied'] == true;
-                          final hasWip = context.select<CartService, bool>(
-                            (c) => c.hasLocalItemsFor(t['_id'] as String?),
-                          );
-                          final Color tileColor;
-                          final Color borderColor;
-                          final String statusLabel;
-                          final Color statusColor;
-                          final IconData icon;
-                          if (occupied) {
-                            tileColor = Colors.orange.shade50;
-                            borderColor = Colors.orange;
-                            statusLabel = 'In progress';
-                            statusColor = Colors.orange.shade800;
-                            icon = Icons.restaurant;
-                          } else if (hasWip) {
-                            tileColor = Colors.amber.shade50;
-                            borderColor = Colors.amber.shade600;
-                            statusLabel = 'Draft';
-                            statusColor = Colors.amber.shade800;
-                            icon = Icons.edit_note;
-                          } else {
-                            tileColor =
-                                Theme.of(context).colorScheme.surface;
-                            borderColor = Colors.black12;
-                            statusLabel = 'Free';
-                            statusColor = Colors.green.shade800;
-                            icon = Icons.table_restaurant;
-                          }
-                          return InkWell(
+                          return _TableTile(
+                            table: t,
                             onTap: () => onTap(t),
-                            borderRadius: BorderRadius.circular(14),
-                            child: Card(
-                              color: tileColor,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
-                                side: BorderSide(
-                                  color: borderColor,
-                                  width:
-                                      occupied || hasWip ? 1.5 : 1,
-                                ),
-                              ),
-                              child: Padding(
-                                padding: const EdgeInsets.all(12),
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      icon,
-                                      size: 38,
-                                      color: occupied || hasWip
-                                          ? statusColor
-                                          : Theme.of(context)
-                                              .colorScheme
-                                              .primary,
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      t['label'] ?? '?',
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .titleLarge,
-                                    ),
-                                    Text(
-                                      statusLabel,
-                                      style: TextStyle(
-                                        color: statusColor,
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
                           );
                         },
                       ),
@@ -270,6 +205,85 @@ class _TablesGridView extends StatelessWidget {
             ),
           ),
       ],
+    );
+  }
+}
+
+class _TableTile extends StatelessWidget {
+  final Map<String, dynamic> table;
+  final VoidCallback onTap;
+  const _TableTile({required this.table, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final t = table;
+    final occupied = t['occupied'] == true;
+    final hasWip = context.select<CartService, bool>(
+      (c) => c.hasLocalItemsFor(t['_id'] as String?),
+    );
+
+    final Color tileColor;
+    final Color borderColor;
+    final String statusLabel;
+    final Color statusColor;
+    final IconData icon;
+    if (occupied) {
+      tileColor = Colors.orange.shade50;
+      borderColor = Colors.orange;
+      statusLabel = 'In progress';
+      statusColor = Colors.orange.shade800;
+      icon = Icons.restaurant;
+    } else if (hasWip) {
+      tileColor = Colors.amber.shade50;
+      borderColor = Colors.amber.shade600;
+      statusLabel = 'Draft';
+      statusColor = Colors.amber.shade800;
+      icon = Icons.edit_note;
+    } else {
+      tileColor = Theme.of(context).colorScheme.surface;
+      borderColor = Colors.black12;
+      statusLabel = 'Free';
+      statusColor = Colors.green.shade800;
+      icon = Icons.table_restaurant;
+    }
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Card(
+        color: tileColor,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: BorderSide(
+            color: borderColor,
+            width: occupied || hasWip ? 1.5 : 1,
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 38,
+                color: occupied || hasWip
+                    ? statusColor
+                    : Theme.of(context).colorScheme.primary,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                t['label'] ?? '?',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              Text(
+                statusLabel,
+                style: TextStyle(color: statusColor, fontSize: 12),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -374,9 +388,25 @@ class _TableOrderViewState extends State<_TableOrderView> {
                         visualDensity: VisualDensity.compact,
                       ),
                     const Spacer(),
-                    Chip(
-                      avatar: const Icon(Icons.shopping_cart, size: 16),
-                      label: Text('${cart.count} · ${_money.format(cart.total)}'),
+                    Builder(
+                      builder: (ctx) {
+                        final isWide = MediaQuery.of(ctx).size.width >=
+                            kWideLayoutBreakpoint;
+                        final chip = Chip(
+                          avatar: const Icon(Icons.shopping_cart, size: 16),
+                          label: Text(
+                              '${cart.count} · ${_money.format(cart.total)}'),
+                        );
+                        // On wide screens the side-panel already shows the cart;
+                        // on narrow, let the cashier tap the chip to open the
+                        // bottom sheet for editing.
+                        if (isWide) return chip;
+                        return InkWell(
+                          onTap: () => CartSheet.show(ctx),
+                          borderRadius: BorderRadius.circular(20),
+                          child: chip,
+                        );
+                      },
                     ),
                   ],
                 ),

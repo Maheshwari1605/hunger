@@ -11,15 +11,10 @@ exports.get = async (req, res, next) => {
 
 exports.update = async (req, res, next) => {
   try {
-    const { taxRate, currency, cafeName, address, phone, gstNumber, receiptFooter } = req.body;
+    const { currency, cafeName, address, phone, gstNumber, receiptFooter } = req.body;
     const $set = {};
-    if (taxRate !== undefined) {
-      const n = Number(taxRate);
-      if (Number.isNaN(n) || n < 0 || n > 1) {
-        return res.status(400).json({ error: 'taxRate must be 0..1 (e.g. 0.05 for 5%)' });
-      }
-      $set.taxRate = n;
-    }
+    // Tax-free POS — always coerce to 0 regardless of what the client sends.
+    $set.taxRate = 0;
     if (currency !== undefined) $set.currency = currency;
     if (cafeName !== undefined) $set.cafeName = cafeName;
     if (address !== undefined) $set.address = address;

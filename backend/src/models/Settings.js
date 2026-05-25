@@ -4,7 +4,8 @@ const mongoose = require('mongoose');
 const settingsSchema = new mongoose.Schema(
   {
     outletId: { type: String, default: 'default', unique: true, index: true },
-    taxRate: { type: Number, default: 0.05, min: 0, max: 1 },
+    // Tax-free POS — always 0. Field is kept for backward compatibility.
+    taxRate: { type: Number, default: 0, min: 0, max: 1 },
     currency: { type: String, default: '₹' },
     cafeName: { type: String, default: 'Hunger Cafe' },
     address: { type: String, default: '' },

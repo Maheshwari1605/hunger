@@ -331,10 +331,6 @@ class _CartBodyState extends State<CartBody> {
                 ],
               ),
               const SizedBox(height: 4),
-              _row(context,
-                  'Tax (${(cart.taxRate * 100).toStringAsFixed(0)}%)',
-                  _money.format(cart.tax)),
-              const SizedBox(height: 4),
               _row(context, 'Total', _money.format(cart.total), bold: true),
               const SizedBox(height: 8),
               SegmentedButton<String>(

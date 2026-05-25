@@ -24,7 +24,7 @@ class OutletSettings {
 
   factory OutletSettings.fromJson(Map<String, dynamic> j) => OutletSettings(
         outletId: (j['outletId'] ?? 'default') as String,
-        taxRate: (j['taxRate'] as num?)?.toDouble() ?? 0.05,
+        taxRate: (j['taxRate'] as num?)?.toDouble() ?? 0,
         currency: (j['currency'] ?? '₹') as String,
         cafeName: (j['cafeName'] ?? 'Hunger Cafe') as String,
         address: (j['address'] ?? '') as String,
@@ -42,7 +42,8 @@ class SettingsService extends ChangeNotifier {
   SettingsService(this._api);
 
   OutletSettings? get settings => _settings;
-  double get taxRate => _settings?.taxRate ?? 0.05;
+  // Tax-free POS — always 0 regardless of what's stored.
+  double get taxRate => 0;
 
   Future<void> load() async {
     try {

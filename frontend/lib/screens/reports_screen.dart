@@ -6,10 +6,16 @@ import 'package:provider/provider.dart';
 import '../services/report_service.dart';
 
 class ReportsScreen extends StatelessWidget {
-  const ReportsScreen({super.key});
+  /// When true, show only today's slim summary (used for the cashier role).
+  /// Admins see the full multi-tab report with monthly + historical data.
+  final bool todayOnly;
+  const ReportsScreen({super.key, this.todayOnly = false});
 
   @override
   Widget build(BuildContext context) {
+    if (todayOnly) {
+      return const _OverviewTab(todayOnly: true);
+    }
     return const DefaultTabController(
       length: 3,
       child: Column(
@@ -38,7 +44,10 @@ class ReportsScreen extends StatelessWidget {
 }
 
 class _OverviewTab extends StatefulWidget {
-  const _OverviewTab();
+  /// When true, the tab restricts itself to today's data only:
+  /// no monthly chart, no historical best sellers.
+  final bool todayOnly;
+  const _OverviewTab({this.todayOnly = false});
   @override
   State<_OverviewTab> createState() => _OverviewTabState();
 }
@@ -55,6 +64,19 @@ class _OverviewTabState extends State<_OverviewTab> {
 
   Future<_OverviewBundle> _load() async {
     final svc = context.read<ReportService>();
+    if (widget.todayOnly) {
+      // Cashier slim view — only today's data + today's payment mix.
+      final results = await Future.wait([
+        svc.daily(),
+        svc.paymentMix(),
+      ]);
+      return _OverviewBundle(
+        daily: results[0] as Map<String, dynamic>,
+        monthly: const {},
+        best: const [],
+        mix: results[1] as List<Map<String, dynamic>>,
+      );
+    }
     final results = await Future.wait([
       svc.daily(),
       svc.monthly(),
@@ -80,6 +102,7 @@ class _OverviewTabState extends State<_OverviewTab> {
         if (snap.hasError) return Center(child: Text('Error: ${snap.error}'));
         final b = snap.data!;
         final summary = (b.daily['summary'] as Map?) ?? const {};
+        final todayOnly = widget.todayOnly;
         return ListView(
           padding: const EdgeInsets.all(16),
           children: [
@@ -93,41 +116,40 @@ class _OverviewTabState extends State<_OverviewTab> {
                     'Today: Revenue',
                     _money.format((summary['revenue'] ?? 0).toDouble()),
                     Icons.payments),
-                _stat('Today: Tax',
-                    _money.format((summary['tax'] ?? 0).toDouble()),
-                    Icons.account_balance),
               ],
             ),
-            const SizedBox(height: 20),
-            Text('Monthly revenue',
-                style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 6),
-            SizedBox(
-              height: 200,
-              child: _MonthlyChart(monthly: b.monthly),
-            ),
-            const SizedBox(height: 20),
-            Text('Best sellers',
-                style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 6),
-            if (b.best.isEmpty)
-              const Text('No sales yet.')
-            else
-              Card(
-                child: Column(
-                  children: [
-                    for (final r in b.best)
-                      ListTile(
-                        dense: true,
-                        leading: const Icon(Icons.star),
-                        title: Text((r['name'] ?? 'Unknown').toString()),
-                        trailing: Text('${r['quantitySold']} sold'),
-                      ),
-                  ],
-                ),
+            if (!todayOnly) ...[
+              const SizedBox(height: 20),
+              Text('Monthly revenue',
+                  style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 6),
+              SizedBox(
+                height: 200,
+                child: _MonthlyChart(monthly: b.monthly),
               ),
+              const SizedBox(height: 20),
+              Text('Best sellers',
+                  style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 6),
+              if (b.best.isEmpty)
+                const Text('No sales yet.')
+              else
+                Card(
+                  child: Column(
+                    children: [
+                      for (final r in b.best)
+                        ListTile(
+                          dense: true,
+                          leading: const Icon(Icons.star),
+                          title: Text((r['name'] ?? 'Unknown').toString()),
+                          trailing: Text('${r['quantitySold']} sold'),
+                        ),
+                    ],
+                  ),
+                ),
+            ],
             const SizedBox(height: 20),
-            Text('Payment mix',
+            Text(todayOnly ? 'Today\'s payment mix' : 'Payment mix',
                 style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 6),
             if (b.mix.isEmpty)

@@ -7,9 +7,13 @@ import '../models/order.dart';
 import '../services/cart_service.dart';
 import '../services/menu_service.dart';
 import '../services/order_service.dart';
+import 'pos_screen.dart';
 
 class HeldOrdersScreen extends StatefulWidget {
-  const HeldOrdersScreen({super.key});
+  /// Read-only mode: kitchen staff can preview upcoming orders but
+  /// cannot resume them into the cart.
+  final bool readOnly;
+  const HeldOrdersScreen({super.key, this.readOnly = false});
 
   @override
   State<HeldOrdersScreen> createState() => _HeldOrdersScreenState();
@@ -34,6 +38,58 @@ class _HeldOrdersScreenState extends State<HeldOrdersScreen> {
           .then((orders) =>
               orders.where((o) => o.paymentStatus == 'open').toList());
     });
+  }
+
+  void _preview(OrderSummary o) {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (_) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Bill ${o.billNumber ?? o.orderNumber}',
+                  style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 4),
+              Text(
+                '${o.orderType} · ${_ts.format(o.createdAt)}'
+                '${o.tableLabel?.isNotEmpty == true ? " · ${o.tableLabel}" : ""}',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const Divider(height: 24),
+              Flexible(
+                child: ListView(
+                  shrinkWrap: true,
+                  children: [
+                    for (final line in o.items)
+                      ListTile(
+                        dense: true,
+                        title: Text(line.name),
+                        subtitle: line.notes.isEmpty
+                            ? null
+                            : Text(line.notes,
+                                style: const TextStyle(fontStyle: FontStyle.italic)),
+                        trailing: Text('× ${line.quantity}'),
+                      ),
+                  ],
+                ),
+              ),
+              const Divider(height: 24),
+              Row(
+                children: [
+                  const Text('Total'),
+                  const Spacer(),
+                  Text(_money.format(o.total),
+                      style: const TextStyle(fontWeight: FontWeight.bold)),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _resume(OrderSummary o) async {
@@ -63,8 +119,28 @@ class _HeldOrdersScreenState extends State<HeldOrdersScreen> {
       ));
     }
     if (!mounted) return;
-    context.read<CartService>().loadFromOrder(o, lines);
-    Navigator.of(context).pop(); // back to POS
+
+    final cart = context.read<CartService>();
+    // Switch the cart to the table this order belonged to so loadFromOrder
+    // writes into the right per-table slot.
+    cart.selectTable(id: o.tableId, label: o.tableLabel ?? '');
+    cart.loadFromOrder(o, lines);
+
+    // Held tab is a tab body, not a pushed route — popping from it leaves a
+    // blank scaffold. Push a full POS view instead and reload on return so
+    // settled / re-held orders update the list.
+    final initialTable = o.tableId == null
+        ? null
+        : <String, dynamic>{
+            '_id': o.tableId,
+            'label': o.tableLabel ?? '',
+          };
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => PosScreen(initialTable: initialTable),
+      ),
+    );
+    if (mounted) _reload();
   }
 
   @override
@@ -101,7 +177,7 @@ class _HeldOrdersScreenState extends State<HeldOrdersScreen> {
                     '${_ts.format(o.createdAt)} · ${o.items.length} items · ${o.customerName?.isNotEmpty == true ? o.customerName : "-"}'),
                 trailing: Text(_money.format(o.total),
                     style: const TextStyle(fontWeight: FontWeight.bold)),
-                onTap: () => _resume(o),
+                onTap: widget.readOnly ? () => _preview(o) : () => _resume(o),
               );
             },
           );

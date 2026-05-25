@@ -6,7 +6,10 @@ import '../models/menu_item.dart';
 import '../services/menu_service.dart';
 
 class MenuScreen extends StatefulWidget {
-  const MenuScreen({super.key});
+  /// When true, hide FAB and per-item edit/delete actions.
+  /// Non-admin users (cashier, kitchen) see a view-only catalog.
+  final bool readOnly;
+  const MenuScreen({super.key, this.readOnly = false});
 
   @override
   State<MenuScreen> createState() => _MenuScreenState();
@@ -83,12 +86,15 @@ class _MenuScreenState extends State<MenuScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final readOnly = widget.readOnly;
     return Scaffold(
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _editOrCreate(),
-        icon: const Icon(Icons.add),
-        label: const Text('Add item'),
-      ),
+      floatingActionButton: readOnly
+          ? null
+          : FloatingActionButton.extended(
+              onPressed: () => _editOrCreate(),
+              icon: const Icon(Icons.add),
+              label: const Text('Add item'),
+            ),
       body: FutureBuilder<List<MenuItem>>(
         future: _future,
         builder: (context, snap) {
@@ -111,19 +117,21 @@ class _MenuScreenState extends State<MenuScreen> {
                 title: Text(m.name),
                 subtitle: Text('${m.category} · ${_money.format(m.price)}'
                     '${m.available ? '' : ' · UNAVAILABLE'}'),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.edit_outlined),
-                      onPressed: () => _editOrCreate(m),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.delete_outline),
-                      onPressed: () => _delete(m),
-                    ),
-                  ],
-                ),
+                trailing: readOnly
+                    ? null
+                    : Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.edit_outlined),
+                            onPressed: () => _editOrCreate(m),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.delete_outline),
+                            onPressed: () => _delete(m),
+                          ),
+                        ],
+                      ),
               );
             },
           );

@@ -67,7 +67,8 @@ class OrderService extends ChangeNotifier {
       }
       if (discount > subtotal) discount = subtotal;
       final taxableBase = (subtotal - discount).clamp(0, double.infinity);
-      final tax = taxableBase * 0.05; // best-effort offline; server re-prices on sync
+      // Tax-free POS — no tax in offline totals either.
+      const tax = 0.0;
       final total = taxableBase + tax;
 
       await _store.enqueueOrder({

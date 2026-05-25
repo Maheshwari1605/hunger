@@ -74,7 +74,10 @@ class ReceiptDialog extends StatelessWidget {
               _row('Subtotal', _money.format(order.subtotal)),
               if (order.discount > 0)
                 _row('Discount', '- ${_money.format(order.discount)}'),
-              _row('Tax', _money.format(order.taxAmount)),
+              // Tax-free POS — only show tax line on legacy orders that
+              // were already settled with a non-zero tax amount.
+              if (order.taxAmount > 0)
+                _row('Tax', _money.format(order.taxAmount)),
               const SizedBox(height: 6),
               _row('Total', _money.format(order.total), bold: true),
               const SizedBox(height: 8),

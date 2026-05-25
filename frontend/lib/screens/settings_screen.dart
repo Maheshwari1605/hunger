@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../services/cart_service.dart';
 import '../services/settings_service.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -12,7 +11,6 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  late final TextEditingController _taxCtrl;
   late final TextEditingController _cafeName;
   late final TextEditingController _address;
   late final TextEditingController _phone;
@@ -24,8 +22,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void initState() {
     super.initState();
     final s = context.read<SettingsService>().settings;
-    _taxCtrl = TextEditingController(
-        text: ((s?.taxRate ?? 0.05) * 100).toStringAsFixed(2));
     _cafeName = TextEditingController(text: s?.cafeName ?? 'Hunger Cafe');
     _address = TextEditingController(text: s?.address ?? '');
     _phone = TextEditingController(text: s?.phone ?? '');
@@ -35,7 +31,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   void dispose() {
-    _taxCtrl.dispose();
     _cafeName.dispose();
     _address.dispose();
     _phone.dispose();
@@ -47,9 +42,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _save() async {
     setState(() => _saving = true);
     try {
-      final taxPercent = double.tryParse(_taxCtrl.text) ?? 5;
       await context.read<SettingsService>().update({
-        'taxRate': taxPercent / 100,
+        // Tax-free POS — always send 0 so older records get reset on the server.
+        'taxRate': 0,
         'cafeName': _cafeName.text,
         'address': _address.text,
         'phone': _phone.text,
@@ -57,7 +52,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
         'receiptFooter': _footer.text,
       });
       if (!mounted) return;
-      context.read<CartService>().setTaxRate(taxPercent / 100);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Settings saved')),
       );
@@ -98,15 +92,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
         TextField(
           controller: _gst,
           decoration: const InputDecoration(labelText: 'GST number'),
-        ),
-        const SizedBox(height: 10),
-        TextField(
-          controller: _taxCtrl,
-          decoration: const InputDecoration(
-            labelText: 'Tax rate (%)',
-            helperText: 'Applied to every order. Default 5%.',
-          ),
-          keyboardType: TextInputType.number,
         ),
         const SizedBox(height: 10),
         TextField(

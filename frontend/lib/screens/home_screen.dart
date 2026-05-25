@@ -3,11 +3,9 @@ import 'package:provider/provider.dart';
 
 import '../models/user.dart';
 import '../services/auth_service.dart';
-import '../services/cart_service.dart';
 import '../services/connectivity_service.dart';
 import '../services/sync_service.dart';
 import '../widgets/brand_logo.dart';
-import '../widgets/cart_sheet.dart';
 import 'pos_screen.dart' show PosScreen, kWideLayoutBreakpoint;
 import 'menu_screen.dart';
 import 'reports_screen.dart';
@@ -39,20 +37,39 @@ class _HomeScreenState extends State<HomeScreen> {
     return <_NavTab>[
       if (user.isAdmin || user.isCashier)
         _NavTab(icon: Icons.point_of_sale, label: 'POS', builder: () => const PosScreen()),
-      if (user.isAdmin || user.isCashier)
-        _NavTab(icon: Icons.pause_circle_outline, label: 'Held', builder: () => const HeldOrdersScreen()),
+      // Held — cashier & admin can resume; kitchen previews read-only.
+      if (user.isAdmin || user.isCashier || user.isKitchen)
+        _NavTab(
+          icon: Icons.pause_circle_outline,
+          label: 'Held',
+          builder: () => HeldOrdersScreen(readOnly: user.isKitchen),
+        ),
       if (user.isAdmin || user.isCashier)
         _NavTab(icon: Icons.table_restaurant, label: 'Tables', builder: () => const TablesScreen()),
       if (user.isAdmin || user.isKitchen)
         _NavTab(icon: Icons.soup_kitchen, label: 'Kitchen', builder: () => const KitchenScreen()),
-      if (user.isAdmin)
-        _NavTab(icon: Icons.restaurant_menu, label: 'Menu', builder: () => const MenuScreen()),
+      // Menu — admin edits, others view-only.
+      _NavTab(
+        icon: Icons.restaurant_menu,
+        label: 'Menu',
+        builder: () => MenuScreen(readOnly: !user.isAdmin),
+      ),
       if (user.isAdmin || user.isCashier)
         _NavTab(icon: Icons.savings_outlined, label: 'Cash', builder: () => const CashSessionScreen()),
-      if (user.isAdmin)
-        _NavTab(icon: Icons.people_outline, label: 'Customers', builder: () => const CustomersScreen()),
-      if (user.isAdmin)
-        _NavTab(icon: Icons.analytics, label: 'Reports', builder: () => const ReportsScreen()),
+      // Customers — admin full edit, cashier view + add only.
+      if (user.isAdmin || user.isCashier)
+        _NavTab(
+          icon: Icons.people_outline,
+          label: 'Customers',
+          builder: () => CustomersScreen(canEdit: user.isAdmin),
+        ),
+      // Reports — admin full, cashier sees today-only slim view.
+      if (user.isAdmin || user.isCashier)
+        _NavTab(
+          icon: Icons.analytics,
+          label: 'Reports',
+          builder: () => ReportsScreen(todayOnly: !user.isAdmin),
+        ),
       if (user.isAdmin)
         _NavTab(icon: Icons.settings, label: 'Settings', builder: () => const SettingsScreen()),
     ];
@@ -65,9 +82,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final tabs = _tabsForUser(user);
     final safeIndex = _index.clamp(0, tabs.length - 1);
     final current = tabs[safeIndex];
-    final isPosTab = current.label == 'POS';
     final isWide = MediaQuery.of(context).size.width >= kWideLayoutBreakpoint;
-    final showHeaderCart = isPosTab && !isWide;
     final useDrawer = tabs.length > 4 || isWide;
 
     return Scaffold(
@@ -127,9 +142,8 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ],
         ),
-        actions: [
-          const _NetworkStatusButton(),
-          if (showHeaderCart) const _CartActionButton(),
+        actions: const [
+          _NetworkStatusButton(),
         ],
       ),
       body: current.builder(),
@@ -290,22 +304,3 @@ class _NetworkInfoSheet extends StatelessWidget {
   }
 }
 
-class _CartActionButton extends StatelessWidget {
-  const _CartActionButton();
-
-  @override
-  Widget build(BuildContext context) {
-    final count = context.select<CartService, int>((c) => c.count);
-    return IconButton(
-      tooltip: 'Cart',
-      onPressed: () => CartSheet.show(context),
-      icon: Badge(
-        isLabelVisible: count > 0,
-        label: Text('$count'),
-        backgroundColor: Theme.of(context).colorScheme.error,
-        textColor: Colors.white,
-        child: const Icon(Icons.shopping_cart_outlined),
-      ),
-    );
-  }
-}

@@ -5,7 +5,10 @@ import 'package:provider/provider.dart';
 import '../services/customer_service.dart';
 
 class CustomersScreen extends StatefulWidget {
-  const CustomersScreen({super.key});
+  /// Whether the current user can edit existing customer records.
+  /// Cashiers can view + add, but only admins can edit existing entries.
+  final bool canEdit;
+  const CustomersScreen({super.key, this.canEdit = true});
 
   @override
   State<CustomersScreen> createState() => _CustomersScreenState();
@@ -133,10 +136,12 @@ class _CustomersScreenState extends State<CustomersScreen> {
                       subtitle: Text(
                         '${c['phone'] ?? ''} · ${c['totalOrders'] ?? 0} orders · ${_money.format((c['totalSpent'] as num?)?.toDouble() ?? 0)}',
                       ),
-                      trailing: IconButton(
-                        icon: const Icon(Icons.edit_outlined),
-                        onPressed: () => _addOrEdit(c),
-                      ),
+                      trailing: widget.canEdit
+                          ? IconButton(
+                              icon: const Icon(Icons.edit_outlined),
+                              onPressed: () => _addOrEdit(c),
+                            )
+                          : null,
                     );
                   },
                 );

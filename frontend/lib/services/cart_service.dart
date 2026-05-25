@@ -25,7 +25,9 @@ class _Cart {
 class CartService extends ChangeNotifier {
   final Map<String, _Cart> _carts = {};
   String _activeKey = '';
-  double taxRate = 0.05;
+  // Tax-free POS. Field is kept for backward compatibility with older code
+  // paths but is always treated as 0.
+  double taxRate = 0;
 
   _Cart get _c => _carts.putIfAbsent(_activeKey, () => _Cart());
 
@@ -151,9 +153,10 @@ class CartService extends ChangeNotifier {
     notifyListeners();
   }
 
-  void setTaxRate(double v) {
-    taxRate = v;
-    notifyListeners();
+  /// Tax-free POS — taxRate is permanently 0. This setter is kept as a
+  /// no-op so older callers in main.dart / settings_service don't break.
+  void setTaxRate(double _) {
+    // intentionally ignored
   }
 
   /// Replace the active cart from a held order (resuming a previously held
